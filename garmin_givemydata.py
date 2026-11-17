@@ -37,7 +37,7 @@ from garmin_mcp.db import (
     widen_start_for_refetch,
 )
 from garmin_mcp.db import query as db_query
-
+from gear import ensure_gear_integrity
 
 def _get_data_dir() -> Path:
     """Determine where to store data (DB, FIT files, .env, browser profile).
@@ -856,6 +856,7 @@ examples:
         fetch_direct_to_db(
             client, conn, start, end, save_raw=args.save_raw, refetch_recent_days=args.refetch_recent_days
         )
+        ensure_gear_integrity(client,conn)
 
         # Report actual row counts from the database (not upsert operations)
         tables = db_query(

@@ -12,7 +12,7 @@ import logging
 import sqlite3
 from pathlib import Path
 from typing import Any, Optional
-
+from gear import upsert_activity_gear
 
 def _default_db_path() -> str:
     """Find the database using the same logic as the CLI."""
@@ -660,6 +660,7 @@ CREATE TABLE IF NOT EXISTS gear (
     date_begin                  TEXT,
     distance_used_meters        REAL,
     duration_used_seconds       INTEGER,
+    num_activities_linked       INTEGER,
     days_used                   INTEGER,
     status                      TEXT,
     max_usage_distance_meters   REAL,
@@ -727,6 +728,12 @@ CREATE TABLE IF NOT EXISTS race_predictions (
     time_half_marathon              REAL,
     time_marathon                   REAL,
     raw_json                        TEXT
+);
+
+CREATE TABLE IF NOT EXISTS activity_gear (
+    activity_id                     INTEGER,
+    gear_id                         TEXT,
+    PRIMARY KEY (activity_id, gear_id)
 );
 
 CREATE TABLE IF NOT EXISTS activity_splits (
@@ -879,6 +886,7 @@ CREATE TABLE IF NOT EXISTS hrv_timeline (
 );
 
 CREATE INDEX IF NOT EXISTS idx_act_weather ON activity_weather (activity_id);
+CREATE INDEX IF NOT EXISTS idx_act_gear ON activity_gear (activity_id);
 CREATE INDEX IF NOT EXISTS idx_trackpoints_activity ON activity_trackpoints (activity_id);
 """
 
@@ -1147,7 +1155,7 @@ def migrate_gear_table(conn: sqlite3.Connection) -> None:
         [
             ("distance_used_meters", "REAL"),
             ("duration_used_seconds", "INTEGER"),
-            ("days_used", "INTEGER"),
+            ("days_used", "INTEGER"), #TODO migrate num_activities_linked
         ],
     )
     _backfill_from_raw(
@@ -1158,7 +1166,7 @@ def migrate_gear_table(conn: sqlite3.Connection) -> None:
         {
             "distance_used_meters": "distanceUsedMeters",
             "duration_used_seconds": "durationUsedSeconds",
-            "days_used": "daysUsed",
+            "days_used": "daysUsed",  #TODO migrate num_activities_linked
         },
     )
 
@@ -4009,9 +4017,9 @@ def upsert_gear(conn, record):
     conn.execute(
         """INSERT OR REPLACE INTO gear
            (gear_id, gear_type, display_name, brand, model, date_begin,
-            distance_used_meters, duration_used_seconds, days_used,
+            distance_used_meters, duration_used_seconds, num_activities_linked, days_used,
             status, max_usage_distance_meters, raw_json)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             str(g_id),
             record.get("gearTypeName") or record.get("gearType"),
@@ -4021,6 +4029,7 @@ def upsert_gear(conn, record):
             record.get("dateBegin") or record.get("firstUseDate"),
             record.get("distanceUsedMeters"),
             record.get("durationUsedSeconds"),
+            record.get("numActivitiesLinked"),
             record.get("daysUsed"),
             record.get("status"),
             record.get("maxUsageDistanceMeters"),
@@ -4309,7 +4318,7 @@ def save_to_db(conn: sqlite3.Connection, endpoint_name: str, data, cal_date: str
     data : dict or list
         The raw data returned by the API.
     cal_date : str, optional
-        The calendar date for daily endpoints (when not embedded in data).
+        The calendar date for daily endpoints (when not embedded in data). Or the activity id as a str 
 
     Returns
     -------
@@ -4706,6 +4715,11 @@ def save_to_db(conn: sqlite3.Connection, endpoint_name: str, data, cal_date: str
             aid = int(cal_date) if cal_date else None
             if aid:
                 count = upsert_activity_exercise_sets(conn, aid, data)
+        
+        elif name == "activity_gear":
+            aid = int(cal_date) if cal_date else None
+            if aid:
+                count = upsert_activity_gear(conn,aid,data)
 
         else:
             log.debug("save_to_db: no handler for endpoint '%s', skipping %d records", endpoint_name, len(records))

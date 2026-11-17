@@ -25,3 +25,10 @@ garmin_session.json
 .codex
 .codex/
 downloaded_files/
+GarminDebug.py
+GarminFetch.sh
+GarminTryGear.py
+GarminTryUpdateGear.py
+obsolete/.DS_Store
+obsolete/run_mcp.py
+.DS_Store

@@ -18,7 +18,7 @@ def profile_endpoints() -> dict:
         "training_plans": "/gc-api/trainingplan-service/trainingplan/plans?limit=50",
         "sync_timestamp": "/gc-api/wellness-service/wellness/syncTimestamp",
         "activity_types": "/gc-api/activity-service/activity/activityTypes",
-        "gear_list": "/gc-api/gear-service/gear/v2/list",
+        "gear_list": "/gc-api/gear-service/gear/v2/list?limit=100&gearStatuses=RETIRED&gearStatuses=ACTIVE", #bug fixed default limit and missing retired gear
         "gear_types": "/gc-api/gear-service/gear/v2/user-gear-types",
         "goals": "/gc-api/goal-service/goal/goals",
         "weight_first": "/gc-api/weight-service/weight/first",
@@ -167,4 +167,5 @@ def activity_detail_endpoints(activity_id: int) -> dict:
         "activity_weather": f"/gc-api/activity-service/activity/{aid}/weather",
         "activity_details": f"/gc-api/activity-service/activity/{aid}",
         "activity_exercise_sets": f"/gc-api/activity-service/activity/{aid}/exerciseSets",
+        "activity_gear": f"https://connect.garmin.com/gc-api/gear-service/activity/v2/{aid}" #TODO including gear endpoint
     }

@@ -13,7 +13,7 @@ echo
 echo "[1/5] Checking Python..."
 
 PYTHON=""
-for cmd in python3.12 python3.11 python3.10 python3 python; do
+for cmd in python3.13 python3.12 python3.11 python3.10 python3 python; do
     if command -v "$cmd" &>/dev/null; then
         version=$("$cmd" -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null || echo "0.0")
         major=$(echo "$version" | cut -d. -f1)

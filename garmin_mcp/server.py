@@ -349,7 +349,7 @@ def garmin_activities(
 ) -> str:
     """List activities with optional filters by type and date range.
 
-    Returns key fields: name, type, date, duration_min, distance_km,
+    Returns key fields: activity_id, name, type, date, duration_min, distance_km,
     calories, avg_hr, elevation, power, training_load, location.
     """
     conditions = []
@@ -370,6 +370,7 @@ def garmin_activities(
 
     sql = f"""
         SELECT
+            activity_id                                 AS activity_id,
             activity_name                               AS name,
             activity_type                               AS type,
             start_time_local                            AS date,
@@ -868,8 +869,8 @@ def garmin_activity_detail(activity_id: int = 0, last: bool = False) -> str:
     """Deep-dive into a single activity.
 
     Pass activity_id, or set last=True for the most recent activity.
-    Returns the activity summary plus splits, HR zones, weather, and
-    exercise sets (if available).
+    Returns the activity summary plus splits, HR zones, weather, 
+    exercise sets (if available), and gear (or equipment) used (if any)
     """
     conn = get_connection()
     try:
@@ -973,6 +974,24 @@ def garmin_activity_detail(activity_id: int = 0, last: bool = False) -> str:
             [activity_id],
         )
 
+        gear = query(
+            conn,
+            """
+            SELECT  a.activity_id, 
+                    a.activity_name, 
+                    a.start_time_local, 
+                    a.activity_type,
+                    a.duration_seconds,
+                    a.distance_meters
+            FROM 
+                activity_gear ag
+                JOIN gear g ON g.gear_id = ag.gear_id
+                JOIN activity a ON a.activity_id = ag.activity_id
+            WHERE a.activity_id = ?
+            """,
+            [activity_id], 
+        )
+
         result = {
             "activity": activity[0],
             "splits": splits if splits else [],
@@ -985,6 +1004,7 @@ def garmin_activity_detail(activity_id: int = 0, last: bool = False) -> str:
             if exercise_sets
             else [],
             "running_dynamics": dynamics[0] if dynamics else {},
+            "gear": gear[0] if gear else {},
         }
         return json.dumps(result, separators=(",", ":"), default=str)
     finally:
@@ -2853,6 +2873,40 @@ def garmin_gear() -> str:
     finally:
         conn.close()
 
+# ---------------------------------------------------------------------------
+# garmin_gear_activities — activity list for given gear
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def garmin_gear_activities(gear_brand: str) -> str:
+    """Garmin activity summary for gear with given gear brand"""
+    conn = get_connection()
+    q="""
+        SELECT a.activity_id, a.activity_name, a.start_time_local, a.activity_type,
+            ROUND(a.duration_seconds/60.0,1) AS min,
+            ROUND(a.distance_meters/1000.0,1) AS km
+        FROM activity_gear ag
+        JOIN gear g ON g.gear_id = ag.gear_id
+        JOIN activity a ON a.activity_id = ag.activity_id
+        WHERE g.brand LIKE ?
+        ORDER BY a.start_time_local DESC
+        LIMIT 100
+    """
+
+    try:
+        rows = query(conn,q,[gear_brand+'%'])
+        return json.dumps(
+            {
+                "total_activities": len(rows),
+                "activity_id_list": rows,
+                "note": "No activities for this gear" if not rows else None,
+            },
+            separators=(",", ":"),
+            default=str,
+        )
+    finally:
+        conn.close()
 
 # ---------------------------------------------------------------------------
 # garmin_daily_events — notable daily events
